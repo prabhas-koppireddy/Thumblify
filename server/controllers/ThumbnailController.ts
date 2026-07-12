@@ -1,8 +1,6 @@
 import { Request, Response } from "express";
 import Thumbnail from "../models/Thumbnail.js";
 import ai from "../configs/ai.js";
-import path from "path";
-import fs from "fs";
 import { v2 as cloudinary } from "cloudinary";
 
 const stylePrompts = {
@@ -85,51 +83,49 @@ export const generateThumbnail = async (req: Request, res: Response) => {
     prompt += `The thumbnail should be ${aspect_ratio}, visually stunning, and designed to maximize click-through rate. Make it bold, professional, and impossible to ignore.`;
 
     const sizeMap = {
-      "16:9": "1792x1024",
+      "16:9": "1536x1024",
       "1:1": "1024x1024",
-      "9:16": "1024x1792",
+      "9:16": "1024x1536",
     };
-    const size = sizeMap[aspect_ratio as keyof typeof sizeMap] || "1792x1024";
+    const size = sizeMap[aspect_ratio as keyof typeof sizeMap] || "1536x1024";
 
-    // Generate the image using OpenAI gpt-image-2
-    const response = await ai.images.generate({
-      model: "gpt-image-2",
-      prompt,
-      n: 1,
-      size: size as any,
-    });
-
-    const b64Data = response.data?.[0]?.b64_json;
-    if (!b64Data) {
-      throw new Error("Failed to generate image from OpenAI");
-    }
-
-    const finalBuffer = Buffer.from(b64Data, "base64");
-
-    const filename = `final-output-${Date.now()}.png`;
-    const filePath = path.join("images", filename);
-
-    // Create the images directory if it doesn't exist
-    fs.mkdirSync("images", { recursive: true });
-
-    // Write the final image to the file
-    fs.writeFileSync(filePath, finalBuffer!);
-
-    const uploadResult = await cloudinary.uploader.upload(filePath, {
-      resource_type: "image",
-    });
-
-    thumbnail.image_url = uploadResult.url;
-    thumbnail.isGenerating = false;
-    await thumbnail.save();
-
+    // Respond immediately to the client so they can navigate and poll
     res.json({
-      message: "Thumbnail Generated",
+      message: "Thumbnail Generation Started",
       thumbnail,
     });
 
-    // remove image file from disk
-    fs.unlinkSync(filePath);
+    // Run the generation process in the background
+    (async () => {
+      try {
+        // Generate the image using OpenAI gpt-image-1.5
+        const response = await ai.images.generate({
+          model: "gpt-image-1.5",
+          prompt,
+          n: 1,
+          size: size as any,
+        });
+
+        const b64Data = response.data?.[0]?.b64_json;
+        if (!b64Data) {
+          throw new Error("Failed to generate image from OpenAI");
+        }
+
+        // Upload the base64 string directly to Cloudinary
+        const uploadResult = await cloudinary.uploader.upload(`data:image/png;base64,${b64Data}`, {
+          resource_type: "image",
+        });
+
+        thumbnail.image_url = uploadResult.url;
+        thumbnail.isGenerating = false;
+        await thumbnail.save();
+      } catch (bgError: any) {
+        console.error("Error generating thumbnail in background:", bgError);
+        thumbnail.isGenerating = false;
+        await thumbnail.save();
+      }
+    })();
+
   } catch (error: any) {
     console.log(error);
     res.status(500).json({ message: error.message });
