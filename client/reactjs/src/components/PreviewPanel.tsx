@@ -16,15 +16,33 @@ const PreviewPanel = ({
     "9:16": "aspect-[9/16]",
   } as Record<AspectRatio, string>;
 
-  const onDownload = () => {
-  if (!thumbnail?.image_url) return;
+  const onDownload = async () => {
+    if (!thumbnail?.image_url) return;
 
-  const link = document.createElement('a');
-  link.href = thumbnail?.image_url.replace('/upload', '/upload/fl_attachment');
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-};
+    try {
+      const response = await fetch(thumbnail.image_url);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      const cleanTitle = thumbnail.title
+        ? thumbnail.title.replace(/[^a-z0-9]/gi, "_").toLowerCase()
+        : "thumbnail";
+      link.download = `${cleanTitle}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error("Failed to download image using fetch", error);
+      const link = document.createElement("a");
+      link.href = thumbnail.image_url.replace("/upload", "/upload/fl_attachment");
+      link.target = "_blank";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
 
   return (
     <div className="relative mx-auto w-full max-w-2xl">

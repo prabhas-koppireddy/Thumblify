@@ -33,15 +33,30 @@ function MyGeneration() {
     }
   };
 
-  const handleDownlaod = (image_url: string) => {
-    const link = document.createElement("a");
-    link.href = image_url.replace(
-      "/upload",
-      "/upload/fl_attachment",
-    );
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+  const handleDownload = async (imageUrl: string, title?: string) => {
+    try {
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      const cleanTitle = title
+        ? title.replace(/[^a-z0-9]/gi, "_").toLowerCase()
+        : "thumbnail";
+      link.download = `${cleanTitle}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error("Failed to download image using fetch", error);
+      const link = document.createElement("a");
+      link.href = imageUrl.replace("/upload", "/upload/fl_attachment");
+      link.target = "_blank";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -165,7 +180,7 @@ function MyGeneration() {
                     />
 
                     <DownloadIcon
-                      onClick={() => handleDownlaod(thumb.image_url!)}
+                      onClick={() => handleDownload(thumb.image_url!, thumb.title)}
                       className="size-6 bg-black/50 p-1 rounded hover:bg-pink-600 transition-all"
                     />
 
