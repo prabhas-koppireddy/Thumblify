@@ -1,10 +1,5 @@
 import { Request, Response } from "express";
 import Thumbnail from "../models/Thumbnail.js";
-import {
-  GenerateContentConfig,
-  HarmBlockThreshold,
-  HarmCategory,
-} from "@google/genai";
 import ai from "../configs/ai.js";
 import path from "path";
 import fs from "fs";
@@ -77,37 +72,6 @@ export const generateThumbnail = async (req: Request, res: Response) => {
       isGenerating: true,
     });
 
-    const model = "gemini-3-pro-image-preview"; // gemini-3.1-flash-image-preview
-
-    const generationConfig: GenerateContentConfig = {
-      maxOutputTokens: 32768,
-      temperature: 1,
-      topP: 0.95,
-      responseModalities: ["IMAGE"],
-      imageConfig: {
-        aspectRatio: aspect_ratio || "16:9",
-        imageSize: "1K",
-      },
-      safetySettings: [
-        {
-          category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-          threshold: HarmBlockThreshold.OFF,
-        },
-        {
-          category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-          threshold: HarmBlockThreshold.OFF,
-        },
-        {
-          category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-          threshold: HarmBlockThreshold.OFF,
-        },
-        {
-          category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-          threshold: HarmBlockThreshold.OFF,
-        },
-      ],
-    };
-
     let prompt = `Create a ${stylePrompts[style as keyof typeof stylePrompts]} for: "${title}"`;
 
     if (color_scheme) {
@@ -120,27 +84,27 @@ export const generateThumbnail = async (req: Request, res: Response) => {
 
     prompt += `The thumbnail should be ${aspect_ratio}, visually stunning, and designed to maximize click-through rate. Make it bold, professional, and impossible to ignore.`;
 
-    // Generate the image using the AI model
-    const response: any = await ai.models.generateContent({
-      model,
-      contents: [prompt],
-      config: generationConfig,
+    const sizeMap = {
+      "16:9": "1792x1024",
+      "1:1": "1024x1024",
+      "9:16": "1024x1792",
+    };
+    const size = sizeMap[aspect_ratio as keyof typeof sizeMap] || "1792x1024";
+
+    // Generate the image using OpenAI gpt-image-2
+    const response = await ai.images.generate({
+      model: "gpt-image-2",
+      prompt,
+      n: 1,
+      size: size as any,
     });
 
-    // Check if the response is valid
-    if (!response?.candidates?.[0]?.content?.parts) {
-      throw new Error("Unexpected response");
+    const b64Data = response.data?.[0]?.b64_json;
+    if (!b64Data) {
+      throw new Error("Failed to generate image from OpenAI");
     }
 
-    const parts = response.candidates[0].content.parts;
-
-    let finalBuffer: Buffer | null = null;
-
-    for (const part of parts) {
-      if (part.inlineData) {
-        finalBuffer = Buffer.from(part.inlineData.data, "base64");
-      }
-    }
+    const finalBuffer = Buffer.from(b64Data, "base64");
 
     const filename = `final-output-${Date.now()}.png`;
     const filePath = path.join("images", filename);
