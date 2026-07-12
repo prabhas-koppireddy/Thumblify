@@ -116,7 +116,7 @@ export const generateThumbnail = async (req: Request, res: Response) => {
           resource_type: "image",
         });
 
-        thumbnail.image_url = uploadResult.url;
+        thumbnail.image_url = uploadResult.secure_url;
         thumbnail.isGenerating = false;
         await thumbnail.save();
       } catch (bgError: any) {
@@ -150,5 +150,36 @@ export const deleteThumbnail = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.log(error);
     res.status(500).json({ message: error.message });
+  }
+};
+
+// Controller to proxy thumbnail downloading to bypass CORS/mixed-content restrictions
+export const downloadThumbnail = async (req: Request, res: Response) => {
+  try {
+    const { url } = req.query;
+    if (!url || typeof url !== "string") {
+      return res.status(400).json({ message: "URL is required" });
+    }
+
+    // Validate that URL is a Cloudinary URL to prevent SSRF
+    if (!url.startsWith("http://res.cloudinary.com") && !url.startsWith("https://res.cloudinary.com")) {
+      return res.status(400).json({ message: "Invalid image URL" });
+    }
+
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch image: ${response.statusText}`);
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    const contentType = response.headers.get("content-type") || "image/png";
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Content-Disposition", `attachment; filename="thumbnail.png"`);
+    res.send(buffer);
+  } catch (error: any) {
+    console.error("Error downloading thumbnail:", error);
+    res.status(500).json({ message: error.message || "Failed to download thumbnail" });
   }
 };

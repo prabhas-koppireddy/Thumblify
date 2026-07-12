@@ -35,8 +35,11 @@ function MyGeneration() {
 
   const handleDownload = async (imageUrl: string, title?: string) => {
     try {
-      const response = await fetch(imageUrl);
-      const blob = await response.blob();
+      const response = await api.get("/api/thumbnail/download", {
+        params: { url: imageUrl },
+        responseType: "blob",
+      });
+      const blob = response.data;
       const blobUrl = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = blobUrl;
@@ -49,13 +52,8 @@ function MyGeneration() {
       document.body.removeChild(link);
       URL.revokeObjectURL(blobUrl);
     } catch (error) {
-      console.error("Failed to download image using fetch", error);
-      const link = document.createElement("a");
-      link.href = imageUrl.replace("/upload", "/upload/fl_attachment");
-      link.target = "_blank";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      console.error("Failed to download image using backend proxy", error);
+      window.open(imageUrl, "_blank");
     }
   };
 
