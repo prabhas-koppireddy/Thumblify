@@ -53,8 +53,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       toast.success(data.message);
-    } catch (error) {
+    } catch (error: any) {
       console.log(error);
+      toast.error(error.response?.data?.message || error.message || "Registration failed");
     }
   };
 
@@ -77,8 +78,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       toast.success(data.message);
-    } catch (error) {
+    } catch (error: any) {
       console.log(error);
+      toast.error(error.response?.data?.message || error.message || "Login failed");
     }
   };
 
@@ -90,8 +92,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setIsLoggedIn(false);
 
       toast.success(data.message);
-    } catch (error) {
+    } catch (error: any) {
       console.log(error);
+      toast.error(error.response?.data?.message || error.message || "Logout failed");
     }
   };
 

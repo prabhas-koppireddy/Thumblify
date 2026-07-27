@@ -47,7 +47,7 @@ const Login = () => {
           </h1>
 
           <p className="text-gray-400 text-sm mt-2">
-            Please sign in to continue
+            {state === "login" ? "Please sign in to continue" : "Please sign up to continue"}
           </p>
 
           {state !== "login" && (
@@ -136,11 +136,13 @@ const Login = () => {
             />
           </div>
 
-          <div className="mt-4 text-left">
-            <button className="text-sm text-pink-400 hover:underline">
-              Forget password?
-            </button>
-          </div>
+          {state === "login" && (
+            <div className="mt-4 text-left">
+              <button type="button" className="text-sm text-pink-400 hover:underline">
+                Forget password?
+              </button>
+            </div>
+          )}
 
           <button
             type="submit"
